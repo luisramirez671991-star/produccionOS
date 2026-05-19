@@ -621,63 +621,83 @@ function renderDash(){
 // ─── INVENTARIO MP ─────────────────────────────────────────────
 function renderInvMP() {
     var prods = S.materiasPrimas.slice();
-    var q = (ge('invQ')?.value || '').toLowerCase();
-    if (q) {
+    var searchText = ge('invQ').value.trim().toLowerCase();
+    
+    // Filtrar por texto de búsqueda
+    if (searchText !== "") {
         prods = prods.filter(function(p) {
-            return (p.name || '').toLowerCase().includes(q) ||
-                   (p.cat || '').toLowerCase().includes(q);
+            return (p.name || "").toLowerCase().includes(searchText);
         });
     }
-    if (S.iFilter === 'low') prods = prods.filter(function(p) { return p.stock > 0 && p.stock <= (p.minStock || 0); });
-    else if (S.iFilter === 'out') prods = prods.filter(function(p) { return p.stock <= 0; });
+    
+    // Filtrar por stock bajo o agotados
+    if (S.iFilter === 'low') {
+        prods = prods.filter(function(p) { 
+            return p.stock > 0 && p.stock <= (p.minStock || 0); 
+        });
+    } else if (S.iFilter === 'out') {
+        prods = prods.filter(function(p) { 
+            return p.stock <= 0; 
+        });
+    }
 
-    var totalVal = S.materiasPrimas.reduce(function(a, p) { return a + (p.stock || 0) * (mpCostPerUnit(p) || 0); }, 0);
+    // Calcular valor total del inventario
+    var totalVal = S.materiasPrimas.reduce(function(a, p) { 
+        return a + (p.stock || 0) * (mpCostPerUnit(p) || 0); 
+    }, 0);
+    
+    // Actualizar estadísticas
     var is = ge('invStats');
-    if (is) is.innerHTML = '<div class="sc"><div class="sl">Total materias primas</div><div class="sv cb">' + S.materiasPrimas.length + '</div></div><div class="sc"><div class="sl">Valor total inventario</div><div class="sv cy">' + fmt(totalVal) + '</div></div>';
+    if (is) {
+        is.innerHTML = '<div class="sc"><div class="sl">Total materias primas</div><div class="sv cb">' + S.materiasPrimas.length + '</div></div>' +
+                       '<div class="sc"><div class="sl">Valor total inventario</div><div class="sv cy">' + fmt(totalVal) + '</div></div>';
+    }
 
+    // Si no hay materias primas
     if (!S.materiasPrimas.length) {
-        var emp = ge('invEmpty');
-        if (emp) emp.style.display = 'block';
+        if (ge('invEmpty')) ge('invEmpty').style.display = 'block';
         if (ge('mpList')) ge('mpList').innerHTML = '';
         return;
     }
     if (ge('invEmpty')) ge('invEmpty').style.display = 'none';
 
-    var h = '';
+    // Si no hay resultados de búsqueda
     if (!prods.length) {
-        h = '<div class="empty" style="padding:16px 0"><div class="ei">🔍</div><div class="et">Sin resultados</div></div>';
-    } else {
-        prods.forEach(function(p) {
-            var sc = p.stock <= 0 ? '#fb7185' : (p.stock <= (p.minStock || 0) ? '#fbbf24' : '#34d399');
-            var sl = p.stock <= 0 ? 'Agotado' : (p.stock <= (p.minStock || 0) ? 'Stock bajo' : 'En stock');
-            var cpu = mpCostPerUnit(p);
-            h += '<div class="pc">' +
-                '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
-                '<div style="display:flex;gap:9px;align-items:flex-start;flex:1;min-width:0">' +
-                '<div style="font-size:24px;flex-shrink:0">' + (p.emoji || '🧪') + '</div>' +
-                '<div style="flex:1;min-width:0">' +
-                '<div style="font-size:13px;font-weight:700">' + p.name + '</div>' +
-                '<div style="font-size:10px;color:var(--soft);margin-top:1px">' + p.cat + (p.prov ? ' · ' + p.prov : '') + '</div>' +
-                '</div>' +
-                '</div>' +
-                '<span style="background:rgba(0,0,0,.2);color:' + sc + ';border:1px solid ' + sc + '4d;border-radius:20px;font-size:10px;font-weight:700;padding:2px 8px;flex-shrink:0;margin-left:6px">' + sl + '</span>' +
-                '</div>' +
-                '<div class="pcg">' +
-                '<div class="pci"><div class="pcil">Stock</div><div class="pciv" style="color:' + sc + '">' + fmtN(p.stock || 0) + '<span style="font-size:9px;color:var(--soft)"> ' + p.unit + '</span></div></div>' +
-                '<div class="pci"><div class="pcil">Mínimo</div><div class="pciv cs">' + fmtN(p.minStock || 0) + ' ' + p.unit + '</div></div>' +
-                '<div class="pci"><div class="pcil">Costo/' + p.unit + '</div><div class="pciv cy">' + fmt(cpu) + '</div></div>' +
-                '<div class="pci"><div class="pcil">Valor total</div><div class="pciv cg">' + fmt((p.stock || 0) * cpu) + '</div></div>' +
-                '</div>' +
-                '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
-                '<button class="btn bg bxs" onclick="openAdjMP(\'' + p.id + '\')">📥 Entrada</button>' +
-                '<button class="btn bi bxs" onclick="openMP(\'' + p.id + '\')">✏️ Editar</button>' +
-                '<button class="btn bd bxs" onclick="cDel(\'mp\',\'' + p.id + '\')">🗑️ Eliminar</button>' +
-                '</div></div>';
-        });
+        ge('mpList').innerHTML = '<div class="empty" style="padding:16px 0"><div class="ei">🔍</div><div class="et">Sin resultados</div></div>';
+        return;
     }
-    if (ge('mpList')) ge('mpList').innerHTML = h;
-}
 
+    // Generar HTML de cada materia prima
+    var h = "";
+    prods.forEach(function(p) {
+        var sc = p.stock <= 0 ? '#fb7185' : (p.stock <= (p.minStock || 0) ? '#fbbf24' : '#34d399');
+        var sl = p.stock <= 0 ? 'Agotado' : (p.stock <= (p.minStock || 0) ? 'Stock bajo' : 'En stock');
+        var cpu = mpCostPerUnit(p);
+        h += '<div class="pc">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+            '<div style="display:flex;gap:9px;align-items:flex-start;flex:1;min-width:0">' +
+            '<div style="font-size:24px;flex-shrink:0">' + (p.emoji || '🧪') + '</div>' +
+            '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:700">' + (p.name || "") + '</div>' +
+            '<div style="font-size:10px;color:var(--soft);margin-top:1px">' + (p.cat || "") + (p.prov ? ' · ' + p.prov : '') + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<span style="background:rgba(0,0,0,.2);color:' + sc + ';border:1px solid ' + sc + '4d;border-radius:20px;font-size:10px;font-weight:700;padding:2px 8px;flex-shrink:0;margin-left:6px">' + sl + '</span>' +
+            '</div>' +
+            '<div class="pcg">' +
+            '<div class="pci"><div class="pcil">Stock</div><div class="pciv" style="color:' + sc + '">' + fmtN(p.stock || 0) + '<span style="font-size:9px;color:var(--soft)"> ' + p.unit + '</span></div></div>' +
+            '<div class="pci"><div class="pcil">Mínimo</div><div class="pciv cs">' + fmtN(p.minStock || 0) + ' ' + p.unit + '</div></div>' +
+            '<div class="pci"><div class="pcil">Costo/' + p.unit + '</div><div class="pciv cy">' + fmt(cpu) + '</div></div>' +
+            '<div class="pci"><div class="pcil">Valor total</div><div class="pciv cg">' + fmt((p.stock || 0) * cpu) + '</div></div>' +
+            '</div>' +
+            '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
+            '<button class="btn bg bxs" onclick="openAdjMP(\'' + p.id + '\')">📥 Entrada</button>' +
+            '<button class="btn bi bxs" onclick="openMP(\'' + p.id + '\')">✏️ Editar</button>' +
+            '<button class="btn bd bxs" onclick="cDel(\'mp\',\'' + p.id + '\')">🗑️ Eliminar</button>' +
+            '</div></div>';
+    });
+    ge('mpList').innerHTML = h;
+}
 function setIF(el, v) {
     S.iFilter = v;
     document.querySelectorAll('#invFilt .pill').forEach(function(p) {
